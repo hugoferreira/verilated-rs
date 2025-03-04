@@ -197,6 +197,22 @@ mod ffi {{
             cpp_out,
             r#"#include <V{c_ty}.h>
 
+#if !defined(VERILATOR_VERSION_MAJOR)
+#define VERILATOR_VERSION_MAJOR 5
+#endif
+
+#if VERILATOR_VERSION_MAJOR >= 5
+#include <verilated_trace.h>
+extern "C" VerilatedTraceBaseC* verilatedvcdc_as_trace_base(VerilatedVcdC* vcd);
+#endif
+
+// Current simulation time (64-bit unsigned)
+vluint64_t main_time = 0;
+// Called by $time in Verilog
+double sc_time_stamp() {{
+    return main_time;  // Note does conversion to real, to match SystemC
+}}
+
 extern "C" {{
   // CONSTRUCTORS
   V{c_ty}*
@@ -231,7 +247,11 @@ extern "C" {{
 
   void
   {c_ty}_trace(V{c_ty}* __ptr, VerilatedVcdC* __tfp, int __levels) {{
+#if VERILATOR_VERSION_MAJOR >= 5
+    __ptr->trace(verilatedvcdc_as_trace_base(__tfp), __levels);
+#else
     __ptr->trace(__tfp, __levels);
+#endif
   }}
 
   void
