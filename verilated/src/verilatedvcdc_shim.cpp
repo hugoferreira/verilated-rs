@@ -3,6 +3,9 @@
 /// \brief VerilatedVcdC Shim: Expose C++ interface as C functions.
 
 #include <verilated_vcd_c.h>
+#if VERILATOR_VERSION_MAJOR >= 5
+#include <verilated_trace.h>
+#endif
 
 // METHODS - User called
 extern "C" {
@@ -44,7 +47,15 @@ verilatedvcdc_open_next(VerilatedVcdC* vcd, int inc_filename) {
 /// Set size in megabytes after which new file should be created
 void
 verilatedvcdc_rollover_mb(VerilatedVcdC* vcd, size_t rolloverMB) {
-    vcd->rolloverMB(rolloverMB);
+#if VERILATOR_VERSION_MAJOR >= 5
+  // In Verilator 5.x, rolloverMB is not available directly on VerilatedVcdC
+  // This is a no-op for Verilator 5.x
+  (void)vcd;
+  (void)rolloverMB;
+#else
+  // In Verilator 4.x, the rolloverMB method is available
+  vcd->rolloverMB(rolloverMB);
+#endif
 }
 
 /// Close dump
@@ -77,5 +88,12 @@ void
 verilatedvcdc_set_time_resolution(VerilatedVcdC* vcd, const char* unit) {
   vcd->set_time_resolution(unit);
 }
+
+// Helper function for Verilator 5.x compatibility
+#if VERILATOR_VERSION_MAJOR >= 5
+VerilatedTraceBaseC* verilatedvcdc_as_trace_base(VerilatedVcdC* vcd) {
+  return dynamic_cast<VerilatedTraceBaseC*>(vcd);
+}
+#endif
 
 }

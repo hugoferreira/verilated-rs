@@ -280,10 +280,21 @@ impl Verilator {
         }
 
         if self.trace {
-            cpp_cfg
-                .define("VM_TRACE", "1")
-                .file(dst.join(format!("V{}__Trace.cpp", top_module)))
-                .file(dst.join(format!("V{}__Trace__Slow.cpp", top_module)));
+            cpp_cfg.define("VM_TRACE", "1");
+            
+            // Check if we're using Verilator 5.x by looking for the trace files
+            let trace_file = dst.join(format!("V{}__Trace.cpp", top_module));
+            let trace_slow_file = dst.join(format!("V{}__Trace__Slow.cpp", top_module));
+            
+            // Only include the trace files if they exist (Verilator 4.x)
+            // In Verilator 5.x, these files don't exist as tracing is handled by the common library
+            if trace_file.exists() {
+                cpp_cfg.file(&trace_file);
+            }
+            
+            if trace_slow_file.exists() {
+                cpp_cfg.file(&trace_slow_file);
+            }
         }
 
         cpp_cfg.compile(&format!("V{}__ALL", top_module));

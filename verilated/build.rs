@@ -42,6 +42,12 @@ fn main() {
             "verilated_vpi.cpp",
         ];
 
+        // Add verilated_threads.cpp for Verilator 5.x
+        let mut files = files;
+        if major >= 5 {
+            files.push("verilated_threads.cpp");
+        }
+
         let files: Vec<PathBuf> = files.iter().map(|p| include.join(p)).collect();
 
         let mut cfg = cc::Build::new();
@@ -71,6 +77,12 @@ fn main() {
         }
         cfg.define("VERILATOR_VERSION_MAJOR", format!("{}", major).as_str())
             .define("VERILATOR_VERSION_MINOR", format!("{}", minor).as_str());
+        
+        // Disable multithreading in Verilator 5.x to avoid undefined VlThreadPool symbol
+        if major >= 5 {
+            cfg.define("VL_ENABLE_MT", "0");
+        }
+        
         cfg.include(&include)
             .include(include.join("vltstd"))
             .files(files)

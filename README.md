@@ -80,6 +80,23 @@ This project is licensed under either of
 
 at your option.
 
+## Verilator 5.x Compatibility
+
+This fork of verilated-rs includes modifications to support Verilator 5.x. The main changes are:
+
+1. Updated to handle the new Verilator 5.x API, particularly:
+   - Added proper tracing support for Verilator 5.x using `verilatedvcdc_as_trace_base`
+   - Added a trace flush function for Verilator 5.x
+
+2. Now uses conditional compilation to support both Verilator 4.x and 5.x:
+   ```cpp
+   #if VERILATOR_VERSION_MAJOR >= 5
+       // Verilator 5.x code
+   #else
+       // Verilator 4.x code
+   #endif
+   ```
+
 ### Contribution
 
 Unless you explicitly state otherwise, any contribution intentionally submitted

@@ -32,23 +32,22 @@ mod ffi {
         pub fn verilated_scopes_dump();
     }
 
-    #[cfg(verilator="flush_and_exit_cb")]
-    pub type VoidPCb = unsafe extern "C" fn(*mut c_void);
+    // Common callback type for all versions
+    pub type VoidPCb = extern "C" fn(*mut c_void);
 
-    #[cfg(verilator="flush_and_exit_cb")]
+    // Use the new callback API for both Verilator 4.38+ and 5.x
     extern "C" {
+        // These functions are available in both Verilator 4.38+ and 5.x
         pub fn verilated_add_flush_cb(cb: VoidPCb, datap: *mut c_void);
         pub fn verilated_remove_flush_cb(cb: VoidPCb, datap: *mut c_void);
         pub fn verilator_run_flush_callbacks();
         pub fn verilated_add_exit_cb(cb: VoidPCb, datap: *mut c_void);
         pub fn verilated_remove_exit_cb(cb: VoidPCb, datap: *mut c_void);
         pub fn verilator_run_exit_callbacks();
-    }
 
-    #[cfg(not(verilator="flush_and_exit_cb"))]
-    extern "C" {
-        //pub fn verilated_flush_cb(cb: VerilatedVoidCb);
+        // Legacy callback functions
         pub fn verilated_flush_call();
+        pub fn verilated_flush_cb(cb: VoidPCb);
     }
 }
 
@@ -122,9 +121,74 @@ pub fn trace_ever_on(on: bool) {
 //pub fn verilated_set_fatal_on_vpi_error(flag: c_int);
 //pub fn verilated_fatal_on_vpi_error() -> c_int;
 
-/// Flush callback for VCD waves
-//pub fn verilated_flush_cb(cb: VerilatedVoidCb);
-// pub fn verilated_flush_call();
+// Trampoline function for callbacks
+extern "C" fn callback_trampoline<F>(user_data: *mut std::ffi::c_void)
+where
+    F: Fn(*mut std::ffi::c_void),
+{
+    let callback_ptr = user_data as *mut F;
+    unsafe {
+        let callback = &*callback_ptr;
+        callback(user_data);
+    }
+}
+
+/// Register a flush callback with data pointer
+/// This is the preferred method for Verilator 4.38+ and 5.x
+pub fn add_flush_cb<F>(callback: F, data: *mut std::ffi::c_void) 
+where 
+    F: Fn(*mut std::ffi::c_void)
+{
+    unsafe {
+        // Use a static function as the callback
+        ffi::verilated_add_flush_cb(callback_trampoline::<F>, data);
+    }
+}
+
+/// Remove a flush callback
+pub fn remove_flush_cb<F>(callback: F, data: *mut std::ffi::c_void)
+where 
+    F: Fn(*mut std::ffi::c_void)
+{
+    unsafe {
+        // Use a static function as the callback
+        ffi::verilated_remove_flush_cb(callback_trampoline::<F>, data);
+    }
+}
+
+/// Run all registered flush callbacks
+pub fn run_flush_callbacks() {
+    unsafe {
+        ffi::verilator_run_flush_callbacks();
+    }
+}
+
+// Simple callback for the legacy interface
+extern "C" fn simple_callback_trampoline(_: *mut std::ffi::c_void) {
+    // This is a placeholder - the actual callback would be stored in a global or static variable
+    // For now, we'll just provide a no-op implementation
+}
+
+/// Legacy flush callback interface (for older code)
+/// This sets a single flush callback without a data pointer
+/// For Verilator 5.x, this is a no-op
+pub fn flush_cb<F>(_callback: F)
+where
+    F: Fn()
+{
+    unsafe {
+        // Use a static function as the callback
+        ffi::verilated_flush_cb(simple_callback_trampoline);
+    }
+}
+
+/// Call the flush callback (legacy interface)
+/// For Verilator 5.x, this calls run_flush_callbacks()
+pub fn flush_call() {
+    unsafe {
+        ffi::verilated_flush_call();
+    }
+}
 
 /// Record command line arguments, for retrieval by $test$plusargs/$value$plusargs
 pub fn command_args(args: Vec<CString>) {

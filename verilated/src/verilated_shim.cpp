@@ -3,15 +3,43 @@
 /// \brief Verilated Shim: Expose C++ static interface as C functions.
 
 #include <verilated.h>
+#include <verilated_vcd_c.h>
+
+// Add stub implementation for VlThreadPool for Verilator 5.x
+#if (VERILATOR_VERSION_MAJOR >= 5)
+#include <verilated_threads.h>
+
+// Only define VlThreadPool if VL_THREADED is not defined
+// This avoids redefinition with Verilator 5.x's own VlThreadPool
+#if !defined(VL_THREADED) && !defined(VL_ENABLE_MT)
+// Define a stub implementation that won't conflict with the real one
+class VlThreadPoolStub {
+public:
+    VlThreadPoolStub(VerilatedContext* contextp, unsigned int nThreads) {}
+    ~VlThreadPoolStub() {}
+};
+#endif
+#endif
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+// Common callback type for all versions
+typedef void (*voidp_cb)(void*);
+
+// Verilator 5.x compatibility
+#if (VERILATOR_VERSION_MAJOR >= 5)
+#define VERILATOR_5X
+#endif
 
 // METHODS - User called
-extern "C" {
 
-    /// Select initial value of otherwise uninitialized signals.
-    ////
-    /// 0 = Set to zeros
-    /// 1 = Set all bits to one
-    /// 2 = Randomize all bits
+/// Select initial value of otherwise uninitialized signals.
+////
+/// 0 = Set to zeros
+/// 1 = Set all bits to one
+/// 2 = Randomize all bits
 void
 verilated_set_rand_reset(int val) {
   Verilated::randReset(val);
@@ -87,8 +115,11 @@ verilated_fatal_on_vpi_error() {
   return Verilated::fatalOnVpiError() ? 1 : 0;
 }
 
-#if VERILATOR_VERSION_MAJOR == 4 && VERILATOR_VERSION_MINOR >= 38
-typedef void (*voidp_cb)(void*);  // Callback type for below
+// In Verilator 5.x, callbacks are handled differently
+// Use a common callback type for all versions
+
+#if VERILATOR_VERSION_MAJOR >= 5
+// Verilator 5.x uses void* callback signature directly
 
 /// Callbacks to run on global flush
 void
@@ -121,26 +152,134 @@ void
 verilator_run_exit_callbacks() {
   Verilated::runExitCallbacks();
 }
-#else // !(VERILATOR_VERSION_MAJOR == 4 && VERILATOR_VERSION_MINOR >= 38)
-/// Flush callback for VCD waves
+
+// Compatibility layer for legacy functions
 void
-verilated_flush_cb(VerilatedVoidCb cb) {
-  Verilated::flushCb(cb);
+verilated_flush_cb(voidp_cb cb) {
+  // For compatibility with older code, add a callback that ignores the data pointer
+  // This is a simple wrapper that calls the callback with NULL data
+  if (cb) {
+    Verilated::addFlushCb(cb, NULL);
+  }
+}
+
+void
+verilated_flush_call() {
+  // Call the flush callbacks for compatibility
+  Verilated::runFlushCallbacks();
+}
+
+#elif VERILATOR_VERSION_MAJOR == 4 && VERILATOR_VERSION_MINOR >= 38
+// Define the legacy callback type for Verilator 4.x
+typedef void (*VerilatedVoidCb)(void);
+
+// Verilator 4.38+ already has the void* callback API
+
+/// Callbacks to run on global flush
+void
+verilated_add_flush_cb(voidp_cb cb, void* datap) {
+  Verilated::addFlushCb(cb, datap);
+}
+
+void
+verilated_remove_flush_cb(voidp_cb cb, void* datap) {
+  Verilated::removeFlushCb(cb, datap);
+}
+
+void
+verilator_run_flush_callbacks() {
+  Verilated::runFlushCallbacks();
+}
+
+/// Callbacks to run prior to termination
+void
+verilated_add_exit_cb(voidp_cb cb, void* datap) {
+  Verilated::addExitCb(cb, datap);
+}
+
+void
+verilated_remove_exit_cb(voidp_cb cb, void* datap) {
+  Verilated::removeExitCb(cb, datap);
+}
+
+void
+verilator_run_exit_callbacks() {
+  Verilated::runExitCallbacks();
+}
+
+void
+verilated_flush_cb(voidp_cb cb) {
+  // Cast to the legacy type for older Verilator versions
+  Verilated::flushCb((VerilatedVoidCb)cb);
 }
 
 void
 verilated_flush_call() {
   Verilated::flushCall();
 }
-#endif // VERILATOR_VERSION_MAJOR == 4 && VERILATOR_VERSION_MINOR >= 38
+
+#else // Older Verilator versions
+// Define the legacy callback type for older Verilator versions
+typedef void (*VerilatedVoidCb)(void);
+
+// For older Verilator versions, provide both APIs
+
+// Implement the new-style callback API using the old API
+void
+verilated_add_flush_cb(voidp_cb cb, void* datap) {
+  // Not directly supported in older Verilator versions
+  // This is an approximation that ignores the data pointer
+  if (cb) {
+    // Cast to the legacy type for older Verilator versions
+    Verilated::flushCb((VerilatedVoidCb)cb);
+  }
+}
+
+void
+verilated_remove_flush_cb(voidp_cb cb, void* datap) {
+  // Not directly supported in older Verilator versions
+  // No easy way to remove callbacks in the old API
+}
+
+void
+verilator_run_flush_callbacks() {
+  Verilated::flushCall();
+}
+
+// Not supported in older versions
+void
+verilated_add_exit_cb(voidp_cb cb, void* datap) {
+  // Not directly supported in older Verilator versions
+}
+
+void
+verilated_remove_exit_cb(voidp_cb cb, void* datap) {
+  // Not directly supported in older Verilator versions
+}
+
+void
+verilator_run_exit_callbacks() {
+  // Not directly supported in older Verilator versions
+}
+
+// Legacy API
+void
+verilated_flush_cb(voidp_cb cb) {
+  // Cast to the legacy type for older Verilator versions
+  Verilated::flushCb((VerilatedVoidCb)cb);
+}
+
+void
+verilated_flush_call() {
+  Verilated::flushCall();
+}
+#endif
 
 /// Record command line arguments, for retrieval by $test$plusargs/$value$plusargs
 void
 verilated_command_args(int argc, const char** argv) {
   Verilated::commandArgs(argc, argv);
 }
-
-//    static CommandArgValues* getCommandArgs() {return &s_args;}
 
 /// Match plusargs with a given prefix. Returns static char* valid only for a single call
 const char*
@@ -175,6 +314,6 @@ verilated_scopes_dump() {
   Verilated::scopesDump();
 }
 
+#ifdef __cplusplus
 }
-
-
+#endif 
