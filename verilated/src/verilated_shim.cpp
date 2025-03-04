@@ -1,6 +1,8 @@
 // -*- mode: C++; c-file-style: "cc-mode" -*-
 /// \file
 /// \brief Verilated Shim: Expose C++ static interface as C functions.
+// Copyright (C) 2018 Dan Glastonbury <dan.glastonbury@gmail.com>
+// Copyright (C) 2023-2024 Hugo Sereno Ferreira <bytter@gmail.com>
 
 #include <verilated.h>
 #include <verilated_vcd_c.h>

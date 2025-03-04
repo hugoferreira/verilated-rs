@@ -1,4 +1,5 @@
 // Copyright (C) 2018 Dan Glastonbury <dan.glastonbury@gmail.com>
+// Copyright (C) 2023-2024 Hugo Sereno Ferreira <bytter@gmail.com>
 
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_int};

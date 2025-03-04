@@ -1,3 +1,6 @@
+// Copyright (C) 2018 Dan Glastonbury <dan.glastonbury@gmail.com>
+// Copyright (C) 2023-2024 Hugo Sereno Ferreira <bytter@gmail.com>
+
 use fnv::FnvHashSet;
 
 use std::env;
